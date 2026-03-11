@@ -67,7 +67,7 @@
     .result-detail span{color:var(--accent-light);}
     #screen-form,#screen-scan,#screen-result{display:none;}
     #screen-form.active,#screen-scan.active,#screen-result.active{display:block;}
-    #canvas{display:none;}
+    #canvas{position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;pointer-events:none;}
     .footer{position:relative;z-index:1;margin-top:1.5rem;font-size:0.72rem;color:var(--text-muted);letter-spacing:1px;text-transform:uppercase;}
   </style>
 </head>
@@ -232,7 +232,7 @@
       var ctx = canvas.getContext('2d');
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      var code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts:'dontInvert' });
+      var code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts:'attemptBoth' });
       if (code && code.data && code.data !== lastScannedToken) {
         lastScannedToken = code.data;
         onQRDetected(code.data);
