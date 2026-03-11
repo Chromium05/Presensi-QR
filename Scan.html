@@ -120,6 +120,7 @@
         <div class="check-icon">✓</div>
         <div id="success-label">QR Terdeteksi!</div>
       </div>
+      <div id="dbg" style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.82);color:#00cec9;font-family:monospace;font-size:11px;line-height:1.7;padding:6px 8px;pointer-events:none;z-index:10;">Menunggu kamera...</div>
     </div>
     <div class="status-bar">
       <span class="dot idle" id="scan-dot"></span>
@@ -148,11 +149,10 @@
   //  Ganti nilai di bawah dengan URL deployment GAS kamu.
   //  Contoh: https://script.google.com/macros/s/AKfyc.../exec
   // ================================================================
-  const GAS_URL = 'https://script.google.com/macros/s/AKfycbygMmmusvS8NJrqUWNUYRoCS6G1OPGw4szlKEzV5Mi0SAIxnl2JmlSa9f9bwjbBpoyW/exec';
+  const GAS_URL = 'GANTI_DENGAN_URL_GAS_KAMU';
   // ================================================================
 
   let videoStream = null, scanning = false, lastScannedToken = null, userData = {};
-
   function showScreen(id) {
     ['screen-form','screen-scan','screen-result'].forEach(function(s){
       document.getElementById(s).classList.remove('active');
@@ -223,20 +223,48 @@
     }
   }
 
+  var _tickCount = 0;
+  function dbg(msg) {
+    var el = document.getElementById('dbg');
+    if (el) el.textContent = msg;
+  }
+
   function tick() {
     if (!scanning) return;
+    _tickCount++;
+
     var video = document.getElementById('video');
     var canvas = document.getElementById('canvas');
-    if (video.readyState === video.HAVE_ENOUGH_DATA) {
-      canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+
+    var state = video.readyState;
+    dbg('Frame #' + _tickCount + ' | readyState=' + state + ' | size=' + video.videoWidth + 'x' + video.videoHeight);
+
+    if (state === video.HAVE_ENOUGH_DATA) {
+      if (video.videoWidth === 0 || video.videoHeight === 0) {
+        dbg('Frame #' + _tickCount + ' | ERROR: video dimensi 0!');
+        requestAnimationFrame(tick);
+        return;
+      }
+
+      canvas.width  = video.videoWidth;
+      canvas.height = video.videoHeight;
       var ctx = canvas.getContext('2d');
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
       var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      dbg('Frame #' + _tickCount + ' | pixels=' + imageData.data.length + ' | jsQR scanning...');
+
       var code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts:'attemptBoth' });
-      if (code && code.data && code.data !== lastScannedToken) {
-        lastScannedToken = code.data;
-        onQRDetected(code.data);
-        return;
+
+      if (code && code.data) {
+        dbg('DETEKSI: ' + code.data);
+        if (code.data !== lastScannedToken) {
+          lastScannedToken = code.data;
+          onQRDetected(code.data);
+          return;
+        }
+      } else {
+        dbg('Frame #' + _tickCount + ' | Tidak ada QR. Coba dekatkan HP ke layar.');
       }
     }
     requestAnimationFrame(tick);
