@@ -153,6 +153,7 @@
   // ================================================================
 
   let videoStream = null, scanning = false, lastScannedToken = null, userData = {};
+
   function showScreen(id) {
     ['screen-form','screen-scan','screen-result'].forEach(function(s){
       document.getElementById(s).classList.remove('active');
@@ -205,9 +206,8 @@
         video.play();
         document.getElementById('cam-placeholder').style.display = 'none';
         document.getElementById('scan-overlay').style.display    = 'flex';
-        scanning = true;
         setScanStatus('loading', 'Mencari QR Code...');
-        requestAnimationFrame(tick);
+        startScanLoop();
       };
     })
     .catch(function(err) {
@@ -216,7 +216,7 @@
   }
 
   function stopCamera() {
-    scanning = false;
+    stopScanLoop();
     if (videoStream) {
       videoStream.getTracks().forEach(function(t){ t.stop(); });
       videoStream = null;
@@ -224,6 +224,8 @@
   }
 
   var _tickCount = 0;
+  var _scanInterval = null;
+
   function dbg(msg) {
     var el = document.getElementById('dbg');
     if (el) el.textContent = msg;
@@ -233,41 +235,49 @@
     if (!scanning) return;
     _tickCount++;
 
-    var video = document.getElementById('video');
+    var video  = document.getElementById('video');
     var canvas = document.getElementById('canvas');
 
-    var state = video.readyState;
-    dbg('Frame #' + _tickCount + ' | readyState=' + state + ' | size=' + video.videoWidth + 'x' + video.videoHeight);
-
-    if (state === video.HAVE_ENOUGH_DATA) {
-      if (video.videoWidth === 0 || video.videoHeight === 0) {
-        dbg('Frame #' + _tickCount + ' | ERROR: video dimensi 0!');
-        requestAnimationFrame(tick);
-        return;
-      }
-
-      canvas.width  = video.videoWidth;
-      canvas.height = video.videoHeight;
-      var ctx = canvas.getContext('2d');
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-      var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      dbg('Frame #' + _tickCount + ' | pixels=' + imageData.data.length + ' | jsQR scanning...');
-
-      var code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts:'attemptBoth' });
-
-      if (code && code.data) {
-        dbg('DETEKSI: ' + code.data);
-        if (code.data !== lastScannedToken) {
-          lastScannedToken = code.data;
-          onQRDetected(code.data);
-          return;
-        }
-      } else {
-        dbg('Frame #' + _tickCount + ' | Tidak ada QR. Coba dekatkan HP ke layar.');
-      }
+    if (!video || video.readyState < 2 || video.videoWidth === 0) {
+      dbg('Frame #' + _tickCount + ' | Menunggu video siap... readyState=' + (video ? video.readyState : '?'));
+      return;
     }
-    requestAnimationFrame(tick);
+
+    canvas.width  = video.videoWidth;
+    canvas.height = video.videoHeight;
+    var ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    dbg('Frame #' + _tickCount + ' | ' + canvas.width + 'x' + canvas.height + ' | jsQR scanning...');
+
+    var code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'attemptBoth' });
+
+    if (code && code.data) {
+      dbg('✓ DETEKSI: ' + code.data);
+      if (code.data !== lastScannedToken) {
+        lastScannedToken = code.data;
+        stopScanLoop();
+        onQRDetected(code.data);
+      }
+    } else {
+      dbg('Frame #' + _tickCount + ' | Tidak ada QR terdeteksi');
+    }
+  }
+
+  function startScanLoop() {
+    stopScanLoop();
+    _tickCount = 0;
+    scanning = true;
+    _scanInterval = setInterval(tick, 300); // scan setiap 300ms
+  }
+
+  function stopScanLoop() {
+    scanning = false;
+    if (_scanInterval) {
+      clearInterval(_scanInterval);
+      _scanInterval = null;
+    }
   }
 
   function onQRDetected(token) {
