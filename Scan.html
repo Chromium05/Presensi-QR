@@ -127,6 +127,11 @@
       <span class="text"    id="scan-text">Menginisialisasi kamera...</span>
     </div>
     <button class="secondary" onclick="goBack()">← Kembali</button>
+    <button class="secondary" style="margin-top:0.4rem;font-size:0.78rem;opacity:0.7;" onclick="takeSnapshot()">🔍 Lihat apa yang dilihat jsQR</button>
+    <div id="snapshot-wrap" style="display:none;margin-top:0.8rem;">
+      <p style="font-size:0.72rem;color:var(--text-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.8px;">Gambar yang diproses jsQR:</p>
+      <img id="snapshot-img" style="width:100%;border-radius:10px;border:1px solid var(--border);" />
+    </div>
   </div>
 
   <!-- SCREEN 3: Hasil check-in -->
@@ -149,7 +154,7 @@
   //  Ganti nilai di bawah dengan URL deployment GAS kamu.
   //  Contoh: https://script.google.com/macros/s/AKfyc.../exec
   // ================================================================
-  const GAS_URL = 'GANTI_DENGAN_URL_GAS_KAMU';
+  const GAS_URL = 'https://script.google.com/macros/s/AKfycbygMmmusvS8NJrqUWNUYRoCS6G1OPGw4szlKEzV5Mi0SAIxnl2JmlSa9f9bwjbBpoyW/exec';
   // ================================================================
 
   let videoStream = null, scanning = false, lastScannedToken = null, userData = {};
@@ -243,13 +248,27 @@
       return;
     }
 
-    canvas.width  = video.videoWidth;
-    canvas.height = video.videoHeight;
-    var ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    // Ambil frame penuh dulu
+    var vw = video.videoWidth, vh = video.videoHeight;
 
-    var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    dbg('Frame #' + _tickCount + ' | ' + canvas.width + 'x' + canvas.height + ' | jsQR scanning...');
+    // Crop area tengah 70% (zona bingkai scan)
+    var cropSize = Math.min(vw, vh) * 0.70;
+    var cropX = (vw - cropSize) / 2;
+    var cropY = (vh - cropSize) / 2;
+
+    // Resize ke 400x400 untuk performa jsQR optimal
+    var scanSize = 400;
+    canvas.width  = scanSize;
+    canvas.height = scanSize;
+    var ctx = canvas.getContext('2d');
+
+    // Tingkatkan kontras sebelum decode
+    ctx.filter = 'contrast(1.6) brightness(1.1)';
+    ctx.drawImage(video, cropX, cropY, cropSize, cropSize, 0, 0, scanSize, scanSize);
+    ctx.filter = 'none';
+
+    var imageData = ctx.getImageData(0, 0, scanSize, scanSize);
+    dbg('Frame #' + _tickCount + ' | crop=' + Math.round(cropSize) + 'px | jsQR scanning...');
 
     var code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'attemptBoth' });
 
@@ -278,6 +297,19 @@
       clearInterval(_scanInterval);
       _scanInterval = null;
     }
+  }
+
+  function takeSnapshot() {
+    var video  = document.getElementById('video');
+    var canvas = document.getElementById('canvas');
+    if (!video || video.readyState < 2) { alert('Kamera belum siap'); return; }
+    canvas.width  = video.videoWidth;
+    canvas.height = video.videoHeight;
+    var ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    var img = document.getElementById('snapshot-img');
+    img.src = canvas.toDataURL('image/jpeg', 0.8);
+    document.getElementById('snapshot-wrap').style.display = 'block';
   }
 
   function onQRDetected(token) {
