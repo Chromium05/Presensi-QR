@@ -232,7 +232,7 @@
       var ctx = canvas.getContext('2d');
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      var code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts:'attemptBoth' });
+      var code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts:'dontInvert' });
       if (code && code.data && code.data !== lastScannedToken) {
         lastScannedToken = code.data;
         onQRDetected(code.data);
