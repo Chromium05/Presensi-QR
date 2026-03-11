@@ -151,7 +151,7 @@
   //  Ganti nilai di bawah dengan URL deployment GAS kamu.
   //  Contoh: https://script.google.com/macros/s/AKfyc.../exec
   // ================================================================
-  const GAS_URL = 'GANTI_DENGAN_URL_GAS_KAMU';
+  const GAS_URL = 'https://script.google.com/macros/s/AKfycbygMmmusvS8NJrqUWNUYRoCS6G1OPGw4szlKEzV5Mi0SAIxnl2JmlSa9f9bwjbBpoyW/exec';
   // ================================================================
 
   let videoStream = null, scanning = false, lastScannedToken = null, userData = {};
@@ -159,7 +159,7 @@
   window.addEventListener('DOMContentLoaded', function() {
     const banner = document.getElementById('url-banner');
     const btn    = document.getElementById('btn-scan');
-    if (GAS_URL && GAS_URL !== 'GANTI_DENGAN_URL_GAS_KAMU') {
+    if (GAS_URL && GAS_URL !== 'https://script.google.com/macros/s/AKfycbygMmmusvS8NJrqUWNUYRoCS6G1OPGw4szlKEzV5Mi0SAIxnl2JmlSa9f9bwjbBpoyW/exec') {
       banner.className   = 'config-banner ok';
       banner.textContent = '✓ GAS URL sudah diset. Siap digunakan.';
     } else {
