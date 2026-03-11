@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Scan Presensi</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
+  <style>
+    :root {
+      --bg:#0f0f13; --surface:#1a1a23; --border:#2a2a38;
+      --accent:#6c5ce7; --accent-glow:rgba(108,92,231,0.35); --accent-light:#a29bfe;
+      --success:#00cec9; --danger:#fd79a8;
+      --text:#e8e8ef; --text-muted:#8888a0;
+      --font:'DM Sans',sans-serif; --mono:'JetBrains Mono',monospace;
+    }
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1.5rem;}
+    body::before{content:'';position:fixed;top:-30%;left:-20%;width:60%;height:60%;background:radial-gradient(ellipse,var(--accent-glow) 0%,transparent 70%);pointer-events:none;z-index:0;animation:float 8s ease-in-out infinite alternate;}
+    body::after{content:'';position:fixed;bottom:-20%;right:-15%;width:50%;height:50%;background:radial-gradient(ellipse,rgba(0,206,201,0.15) 0%,transparent 70%);pointer-events:none;z-index:0;animation:float 10s ease-in-out infinite alternate-reverse;}
+    @keyframes float{0%{transform:translate(0,0) scale(1);}100%{transform:translate(30px,-20px) scale(1.05);}}
+    .card{position:relative;z-index:1;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:2rem;width:100%;max-width:400px;box-shadow:0 20px 60px rgba(0,0,0,0.5);animation:slideUp 0.6s ease-out;}
+    @keyframes slideUp{from{opacity:0;transform:translateY(30px);}to{opacity:1;transform:translateY(0);}}
+    .badge{display:inline-block;background:var(--accent);color:white;font-size:11px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;padding:4px 12px;border-radius:999px;margin-bottom:1rem;}
+    h2{font-size:1.4rem;font-weight:700;margin-bottom:0.4rem;}
+    .meta{font-size:0.83rem;color:var(--text-muted);margin-bottom:1.5rem;}
+    .config-banner{background:rgba(253,121,168,0.08);border:1px solid rgba(253,121,168,0.3);border-radius:10px;padding:10px 14px;font-size:0.78rem;color:var(--danger);margin-bottom:1.2rem;line-height:1.6;}
+    .config-banner code{font-family:var(--mono);background:rgba(253,121,168,0.12);padding:1px 5px;border-radius:4px;}
+    .config-banner.ok{background:rgba(0,206,201,0.08);border-color:rgba(0,206,201,0.3);color:var(--success);}
+    .form-group{margin-bottom:0.85rem;}
+    .form-group label{display:block;font-size:0.72rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:5px;}
+    .form-group input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-family:var(--mono);font-size:0.88rem;transition:border-color 0.2s,box-shadow 0.2s;}
+    .form-group input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow);}
+    .scanner-wrap{position:relative;width:100%;aspect-ratio:1/1;border-radius:14px;overflow:hidden;background:#000;border:1px solid var(--border);margin-bottom:1rem;}
+    #video{width:100%;height:100%;object-fit:cover;display:block;}
+    .scan-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;}
+    .scan-frame{width:65%;aspect-ratio:1;position:relative;}
+    .scan-frame::before,.scan-frame::after,.scan-frame>span::before,.scan-frame>span::after{content:'';position:absolute;width:22px;height:22px;border-color:var(--accent-light);border-style:solid;}
+    .scan-frame::before{top:0;left:0;border-width:3px 0 0 3px;border-radius:4px 0 0 0;}
+    .scan-frame::after{top:0;right:0;border-width:3px 3px 0 0;border-radius:0 4px 0 0;}
+    .scan-frame>span::before{bottom:0;left:0;border-width:0 0 3px 3px;border-radius:0 0 0 4px;}
+    .scan-frame>span::after{bottom:0;right:0;border-width:0 3px 3px 0;border-radius:0 0 4px 0;}
+    .scan-line{position:absolute;left:17.5%;right:17.5%;height:2px;background:linear-gradient(90deg,transparent,var(--accent-light),transparent);border-radius:2px;animation:scanLine 2s ease-in-out infinite;box-shadow:0 0 8px var(--accent);}
+    @keyframes scanLine{0%{top:17.5%;opacity:0;}10%{opacity:1;}90%{opacity:1;}100%{top:82.5%;opacity:0;}}
+    #cam-placeholder{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:var(--bg);color:var(--text-muted);font-size:0.82rem;text-align:center;padding:1rem;}
+    #cam-placeholder .icon{font-size:2.5rem;margin-bottom:4px;}
+    #success-overlay{position:absolute;inset:0;background:rgba(0,206,201,0.12);display:none;flex-direction:column;align-items:center;justify-content:center;gap:10px;animation:fadeIn 0.3s ease;}
+    #success-overlay.show{display:flex;}
+    .check-icon{width:64px;height:64px;border-radius:50%;background:var(--success);display:flex;align-items:center;justify-content:center;font-size:2rem;animation:popIn 0.4s cubic-bezier(0.34,1.56,0.64,1);}
+    @keyframes popIn{from{transform:scale(0);opacity:0;}to{transform:scale(1);opacity:1;}}
+    @keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
+    #success-label{font-weight:700;font-size:0.9rem;color:var(--success);padding:0 1rem;text-align:center;word-break:break-all;}
+    .status-bar{display:flex;align-items:center;gap:8px;margin-bottom:1.2rem;font-size:0.8rem;font-family:var(--mono);min-height:20px;}
+    .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+    .dot.idle{background:var(--text-muted);}.dot.loading{background:var(--accent-light);animation:pulse 1s infinite;}.dot.success{background:var(--success);}.dot.error{background:var(--danger);}
+    @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.3;}}
+    .status-bar .text{color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    button.primary{width:100%;background:var(--accent);color:white;border:none;padding:13px 20px;border-radius:12px;cursor:pointer;font-family:var(--font);font-size:0.92rem;font-weight:600;letter-spacing:0.3px;transition:all 0.25s;margin-bottom:0.6rem;}
+    button.primary:hover:not(:disabled){background:#5b4bd5;transform:translateY(-1px);box-shadow:0 8px 25px var(--accent-glow);}
+    button.primary:disabled{opacity:0.5;cursor:not-allowed;}
+    button.secondary{width:100%;background:transparent;color:var(--text-muted);border:1px solid var(--border);padding:11px 20px;border-radius:12px;cursor:pointer;font-family:var(--font);font-size:0.88rem;font-weight:500;transition:all 0.2s;}
+    button.secondary:hover{border-color:var(--accent);color:var(--accent-light);}
+    .result-icon{width:72px;height:72px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:2.2rem;margin:0.5rem auto 1rem;}
+    .result-icon.success{background:rgba(0,206,201,0.15);color:var(--success);}.result-icon.error{background:rgba(253,121,168,0.15);color:var(--danger);}
+    .result-title{font-size:1.2rem;font-weight:700;text-align:center;margin-bottom:0.4rem;}
+    .result-msg{font-size:0.85rem;color:var(--text-muted);text-align:center;margin-bottom:1.5rem;line-height:1.5;}
+    .result-detail{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-family:var(--mono);font-size:0.78rem;color:var(--text-muted);margin-bottom:1.5rem;line-height:1.9;}
+    .result-detail span{color:var(--accent-light);}
+    #screen-form,#screen-scan,#screen-result{display:none;}
+    #screen-form.active,#screen-scan.active,#screen-result.active{display:block;}
+    #canvas{display:none;}
+    .footer{position:relative;z-index:1;margin-top:1.5rem;font-size:0.72rem;color:var(--text-muted);letter-spacing:1px;text-transform:uppercase;}
+  </style>
+</head>
+<body>
+<div class="card">
+
+  <!-- SCREEN 1: Form identitas -->
+  <div id="screen-form" class="active">
+    <span class="badge">Scan Presensi</span>
+    <h2>Identitas Mahasiswa</h2>
+    <p class="meta">Isi data diri sebelum melakukan scan QR</p>
+    <div id="url-banner" class="config-banner">
+      ⚠️ URL GAS belum diset. Buka file ini dan ubah nilai <code>GAS_URL</code> di bagian script.
+    </div>
+    <div class="form-group">
+      <label>User ID / NIM</label>
+      <input type="text" id="input-userid" placeholder="contoh: mhs-2024001" />
+    </div>
+    <div class="form-group">
+      <label>Device ID</label>
+      <input type="text" id="input-deviceid" placeholder="contoh: android-abc123" />
+    </div>
+    <div class="form-group">
+      <label>Course ID</label>
+      <input type="text" id="input-course" placeholder="contoh: cloud-101" />
+    </div>
+    <div class="form-group">
+      <label>Session ID</label>
+      <input type="text" id="input-session" placeholder="contoh: sesi-02" />
+    </div>
+    <div style="margin-top:1.4rem;">
+      <button class="primary" id="btn-scan" onclick="goToScan()">📷 Lanjut ke Scan QR</button>
+    </div>
+  </div>
+
+  <!-- SCREEN 2: Scanner kamera -->
+  <div id="screen-scan">
+    <span class="badge">Scan QR</span>
+    <h2>Arahkan ke QR Code</h2>
+    <p class="meta">Pastikan QR terlihat jelas di dalam bingkai</p>
+    <div class="scanner-wrap">
+      <video id="video" playsinline autoplay muted></video>
+      <canvas id="canvas"></canvas>
+      <div id="cam-placeholder">
+        <div class="icon">📷</div>
+        <div>Meminta akses kamera...</div>
+      </div>
+      <div class="scan-overlay" id="scan-overlay" style="display:none;">
+        <div class="scan-frame"><span></span></div>
+        <div class="scan-line"></div>
+      </div>
+      <div id="success-overlay">
+        <div class="check-icon">✓</div>
+        <div id="success-label">QR Terdeteksi!</div>
+      </div>
+    </div>
+    <div class="status-bar">
+      <span class="dot idle" id="scan-dot"></span>
+      <span class="text"    id="scan-text">Menginisialisasi kamera...</span>
+    </div>
+    <button class="secondary" onclick="goBack()">← Kembali</button>
+  </div>
+
+  <!-- SCREEN 3: Hasil check-in -->
+  <div id="screen-result">
+    <div id="result-icon-wrap" class="result-icon success">✓</div>
+    <div id="result-title" class="result-title">Presensi Berhasil!</div>
+    <div id="result-msg"   class="result-msg">Kehadiran kamu telah tercatat.</div>
+    <div id="result-detail" class="result-detail"></div>
+    <button class="primary"   onclick="scanAgain()">🔄 Scan Ulang</button>
+    <button class="secondary" onclick="goToForm()">← Ganti Identitas</button>
+  </div>
+
+</div>
+<div class="footer">GAS Backend API v1</div>
+
+<script>
+  // ================================================================
+  //  KONFIGURASI — WAJIB DIISI SEBELUM DEPLOY KE GITHUB PAGES
+  //
+  //  Ganti nilai di bawah dengan URL deployment GAS kamu.
+  //  Contoh: https://script.google.com/macros/s/AKfyc.../exec
+  // ================================================================
+  const GAS_URL = 'GANTI_DENGAN_URL_GAS_KAMU';
+  // ================================================================
+
+  let videoStream = null, scanning = false, lastScannedToken = null, userData = {};
+
+  window.addEventListener('DOMContentLoaded', function() {
+    const banner = document.getElementById('url-banner');
+    const btn    = document.getElementById('btn-scan');
+    if (GAS_URL && GAS_URL !== 'GANTI_DENGAN_URL_GAS_KAMU') {
+      banner.className   = 'config-banner ok';
+      banner.textContent = '✓ GAS URL sudah diset. Siap digunakan.';
+    } else {
+      btn.disabled = true;
+    }
+  });
+
+  function showScreen(id) {
+    ['screen-form','screen-scan','screen-result'].forEach(function(s){
+      document.getElementById(s).classList.remove('active');
+    });
+    document.getElementById(id).classList.add('active');
+  }
+
+  function goToForm()  { stopCamera(); showScreen('screen-form'); }
+  function goBack()    { stopCamera(); showScreen('screen-form'); }
+
+  function goToScan() {
+    const userId    = document.getElementById('input-userid').value.trim();
+    const deviceId  = document.getElementById('input-deviceid').value.trim();
+    const courseId  = document.getElementById('input-course').value.trim();
+    const sessionId = document.getElementById('input-session').value.trim();
+    if (!userId || !deviceId || !courseId || !sessionId) {
+      alert('Semua field wajib diisi terlebih dahulu.');
+      return;
+    }
+    userData = { userId, deviceId, courseId, sessionId };
+    showScreen('screen-scan');
+    startCamera();
+  }
+
+  function scanAgain() {
+    lastScannedToken = null;
+    document.getElementById('success-overlay').classList.remove('show');
+    showScreen('screen-scan');
+    startCamera();
+  }
+
+  function setScanStatus(state, msg) {
+    document.getElementById('scan-dot').className    = 'dot ' + state;
+    document.getElementById('scan-text').textContent = msg;
+  }
+
+  function startCamera() {
+    setScanStatus('loading', 'Meminta akses kamera...');
+    document.getElementById('cam-placeholder').style.display = 'flex';
+    document.getElementById('scan-overlay').style.display    = 'none';
+
+    navigator.mediaDevices.getUserMedia({
+      video: { facingMode:'environment', width:{ideal:640}, height:{ideal:640} }
+    })
+    .then(function(stream) {
+      videoStream = stream;
+      var video = document.getElementById('video');
+      video.srcObject = stream;
+      video.onloadedmetadata = function() {
+        video.play();
+        document.getElementById('cam-placeholder').style.display = 'none';
+        document.getElementById('scan-overlay').style.display    = 'flex';
+        scanning = true;
+        setScanStatus('loading', 'Mencari QR Code...');
+        requestAnimationFrame(tick);
+      };
+    })
+    .catch(function(err) {
+      setScanStatus('error', 'Kamera tidak bisa diakses: ' + err.message);
+    });
+  }
+
+  function stopCamera() {
+    scanning = false;
+    if (videoStream) {
+      videoStream.getTracks().forEach(function(t){ t.stop(); });
+      videoStream = null;
+    }
+  }
+
+  function tick() {
+    if (!scanning) return;
+    var video = document.getElementById('video');
+    var canvas = document.getElementById('canvas');
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+      var ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      var code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts:'dontInvert' });
+      if (code && code.data && code.data !== lastScannedToken) {
+        lastScannedToken = code.data;
+        onQRDetected(code.data);
+        return;
+      }
+    }
+    requestAnimationFrame(tick);
+  }
+
+  function onQRDetected(token) {
+    scanning = false;
+    document.getElementById('success-label').textContent = token;
+    document.getElementById('success-overlay').classList.add('show');
+    setScanStatus('loading', 'Token ditemukan, mencatat kehadiran...');
+
+    var payload = {
+      user_id:    userData.userId,
+      device_id:  userData.deviceId,
+      course_id:  userData.courseId,
+      session_id: userData.sessionId,
+      qr_token:   token,
+      ts:         new Date().toISOString()
+    };
+
+    // Kirim ke GAS lewat HTTP POST
+    // Content-Type: text/plain wajib — GAS menolak preflight CORS dari application/json
+    fetch(GAS_URL + '?path=presence/checkin', {
+      method:   'POST',
+      headers:  { 'Content-Type': 'text/plain;charset=utf-8' },
+      body:     JSON.stringify(payload),
+      redirect: 'follow'
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(res) { onCheckinResult(res, token); })
+    .catch(function(err) {
+      onCheckinResult({ ok:false, error:'Koneksi gagal: ' + err.message }, token);
+    });
+  }
+
+  function onCheckinResult(res, token) {
+    stopCamera();
+    if (res.ok) {
+      showResultScreen(true,  'Presensi Berhasil! 🎉', 'Kehadiran kamu telah tercatat di sistem.', token, res.data);
+    } else {
+      showResultScreen(false, 'Presensi Gagal', res.error || 'Terjadi kesalahan saat check-in.', token, null);
+    }
+  }
+
+  function showResultScreen(success, title, msg, token, data) {
+    document.getElementById('result-icon-wrap').className   = 'result-icon ' + (success ? 'success' : 'error');
+    document.getElementById('result-icon-wrap').textContent = success ? '✓' : '✕';
+    document.getElementById('result-title').textContent = title;
+    document.getElementById('result-msg').textContent   = msg;
+
+    var html = '<span>Token</span>: '   + token                + '<br>'
+             + '<span>Course</span>: '  + userData.courseId    + '<br>'
+             + '<span>Session</span>: ' + userData.sessionId   + '<br>'
+             + '<span>User</span>: '    + userData.userId      + '<br>';
+    if (data && data.presence_id) html += '<span>Presence ID</span>: ' + data.presence_id + '<br>';
+    html += '<span>Waktu</span>: ' + new Date().toLocaleTimeString('id-ID');
+
+    document.getElementById('result-detail').innerHTML = html;
+    showScreen('screen-result');
+  }
+</script>
+</body>
+</html>
