@@ -248,27 +248,21 @@
       return;
     }
 
-    // Ambil frame penuh dulu
     var vw = video.videoWidth, vh = video.videoHeight;
 
-    // Crop area tengah 70% (zona bingkai scan)
-    var cropSize = Math.min(vw, vh) * 0.70;
-    var cropX = (vw - cropSize) / 2;
-    var cropY = (vh - cropSize) / 2;
+    // Crop kotak tengah 65% — buang UI di pinggir layar laptop
+    var cropSize = Math.floor(Math.min(vw, vh) * 0.65);
+    var cropX    = Math.floor((vw - cropSize) / 2);
+    var cropY    = Math.floor((vh - cropSize) / 2);
 
-    // Resize ke 400x400 untuk performa jsQR optimal
-    var scanSize = 400;
-    canvas.width  = scanSize;
-    canvas.height = scanSize;
+    canvas.width  = cropSize;
+    canvas.height = cropSize;
     var ctx = canvas.getContext('2d');
+    // Tanpa filter — ctx.filter tidak didukung di semua browser mobile
+    ctx.drawImage(video, cropX, cropY, cropSize, cropSize, 0, 0, cropSize, cropSize);
 
-    // Tingkatkan kontras sebelum decode
-    ctx.filter = 'contrast(1.6) brightness(1.1)';
-    ctx.drawImage(video, cropX, cropY, cropSize, cropSize, 0, 0, scanSize, scanSize);
-    ctx.filter = 'none';
-
-    var imageData = ctx.getImageData(0, 0, scanSize, scanSize);
-    dbg('Frame #' + _tickCount + ' | crop=' + Math.round(cropSize) + 'px | jsQR scanning...');
+    var imageData = ctx.getImageData(0, 0, cropSize, cropSize);
+    dbg('Frame #' + _tickCount + ' | crop=' + cropSize + 'px | jsQR scanning...');
 
     var code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'attemptBoth' });
 
